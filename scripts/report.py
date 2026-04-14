@@ -102,6 +102,11 @@ def fetch_tech_signals(code: str) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def fetch_news_monitor(code: str, name: str = "") -> dict:
+    data = run_script("news_monitor.py", "--json", code, "--name", name or code)
+    return data if isinstance(data, dict) else {}
+
+
 def format_change(pct):
     if pct is None:
         return "-"
@@ -185,7 +190,15 @@ def build_morning_report(config: dict, portfolio: dict, indices: list, sectors: 
                 if s["code"].startswith("us"):
                     suffix += "（美股为隔夜收盘数据）"
                 pnl_str = f" 持仓盈亏 {holding_pnl:+.2f}" if cost else ""
-                lines.append(f"- {s['name']} ({s['code']}): 昨收 {prev or '-'}，当前 {price or '-'}，{format_change(q.get('change_pct'))}{pnl_str}{suffix}")
+                news_info = fetch_news_monitor(s["code"], s.get("name", "")) if detail == "detailed" else {}
+                news_str = ""
+                if news_info and news_info.get("news"):
+                    sentiment = news_info.get("sentiment", "neutral")
+                    suggestion = news_info.get("suggestion", "")
+                    counts = news_info.get("sentiment_counts", {})
+                    sc = f"(情绪: 正{counts.get('positive',0)} 负{counts.get('negative',0)} 中{counts.get('neutral',0)})"
+                    news_str = f"\n  新闻{s['name']}: {suggestion} {sc}"
+                lines.append(f"- {s['name']} ({s['code']}): 昨收 {prev or '-'}，当前 {price or '-'}{pnl_str}，{format_change(q.get('change_pct'))}{suffix}{news_str}")
         if funds:
             fund_codes = [f["code"] for f in funds]
             fund_data = fetch_funds(fund_codes)
@@ -299,7 +312,15 @@ def build_evening_report(config: dict, portfolio: dict, indices: list, sectors: 
                 pnl_str = f"{holding_pnl:+.2f}" if cost else "-"
                 tech = fetch_tech_signals(s["code"]) if detail == "detailed" else {}
                 tech_str = f" | {tech.get('summary', '')}" if tech and tech.get("summary") and "error" not in tech else ""
-                lines.append(f"- {s['name']} ({s['code']}): 收 {price or '-'}{cost_str}，{format_change(q.get('change_pct'))}，当日 {day_pnl:+.2f} / 持仓 {pnl_str}{suffix}{tech_str}")
+                news_info = fetch_news_monitor(s["code"], s.get("name", "")) if detail == "detailed" else {}
+                news_str = ""
+                if news_info and news_info.get("news"):
+                    sentiment = news_info.get("sentiment", "neutral")
+                    suggestion = news_info.get("suggestion", "")
+                    counts = news_info.get("sentiment_counts", {})
+                    sc = f"(情绪: 正{counts.get('positive',0)} 负{counts.get('negative',0)} 中{counts.get('neutral',0)})"
+                    news_str = f"\n  新闻{s['name']}: {suggestion} {sc}"
+                lines.append(f"- {s['name']} ({s['code']}): 收 {price or '-'}{cost_str}，{format_change(q.get('change_pct'))}，当日 {day_pnl:+.2f} / 持仓 {pnl_str}{suffix}{tech_str}{news_str}")
         if funds:
             fund_codes = [f["code"] for f in funds]
             fund_data = fetch_funds(fund_codes)

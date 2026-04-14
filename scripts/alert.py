@@ -99,6 +99,15 @@ def cmd_check(args: argparse.Namespace) -> int:
                         "direction": "fall",
                     })
 
+    # 4) Enrich stock alerts with news-based position suggestions
+    stock_alerts = [a for a in triggered if a["type"] == "stock"]
+    if stock_alerts:
+        for a in stock_alerts:
+            news_data = run_script("news_monitor.py", "--json", a["code"], "--name", a.get("name", ""))
+            if isinstance(news_data, dict) and news_data.get("news"):
+                a["news_sentiment"] = news_data.get("sentiment", "neutral")
+                a["news_suggestion"] = news_data.get("suggestion", "")
+
     # 3) Fund alerts (using akshare fund estimates)
     funds = portfolio.get("funds", [])
     if funds:
@@ -150,7 +159,10 @@ def cmd_check(args: argparse.Namespace) -> int:
                 elif a["type"] == "fund":
                     lines.append(f"- **{a['name']}({a['code']})** 估算涨跌 {a['estimated_growth']:+.2f}%，触及{'上涨' if a['direction']=='rise' else '下跌'}预警线")
                 else:
+                    sug = a.get("news_suggestion", "")
                     lines.append(f"- **{a['name']}({a['code']})** 当前 {a['price']} 涨跌 {a['change_pct']:+.2f}%，触及{'上涨' if a['direction']=='rise' else '下跌'}预警线")
+                    if sug:
+                        lines.append(f"  - 新闻建议: {sug}")
             lines.append("")
             lines.append("*本 Skill 仅提供看盘辅助，不构成投资建议，投资有风险。*")
             payload = {
@@ -179,6 +191,8 @@ def cmd_check(args: argparse.Namespace) -> int:
                     print(f"  [{a['name']}({a['code']})] 估算涨跌 {a['estimated_growth']:+.2f}%，触及{a['direction']=='rise' and '上涨' or '下跌'}预警线")
                 else:
                     print(f"  [{a['name']}({a['code']})] 当前 {a['price']} 涨跌 {a['change_pct']:+.2f}%，触及{a['direction']=='rise' and '上涨' or '下跌'}预警线")
+                    if a.get("news_suggestion"):
+                        print(f"    新闻建议: {a['news_suggestion']}")
     return 0
 
 

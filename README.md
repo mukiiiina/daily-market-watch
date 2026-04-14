@@ -36,6 +36,7 @@
 | **涨跌预警** | 个股/基金/大盘波动到达阈值时主动提醒 | `alert.py check` / Cron |
 | **市场情绪** | A 股涨跌家数、涨停跌停数、等权涨幅、北向资金流向 | `fetch_market.py breadth` |
 | **技术指标** | 持仓个股 MA/MACD/KDJ/RSI 金叉死叉与趋势提示 | `tech_signals.py` |
+| **新闻舆情监控** | 抓取持仓个股相关新闻，基于关键词做情绪分析并给出持仓建议 | `news_monitor.py` |
 | **定时推送** | 通过 Lark/Feishu Webhook 推送图文报告 | OpenClaw Cron |
 
 ---
@@ -146,6 +147,11 @@ python scripts/tech_signals.py 600519
 python scripts/tech_signals.py hk00700
 python scripts/tech_signals.py TSLA
 
+# 新闻舆情与持仓建议
+python scripts/news_monitor.py 600519
+python scripts/news_monitor.py 00700 --name 腾讯控股
+python scripts/news_monitor.py TSLA --name 特斯拉 --json
+
 # 检查预警
 python scripts/alert.py check
 
@@ -182,6 +188,7 @@ python scripts/report.py evening      # 盘后
 ## 持仓总结
 ### 股票
 - 贵州茅台 (sh600519): 收 1438.0，成本 1400.00，-0.37%，当日 -531.00 / 持仓 +3844.00 [A股] | 跌破MA20
+  新闻贵州茅台: 出现利空新闻但股价暂未明显反应，建议密切关注。 (情绪: 正1 负2 中2)
 - 腾讯控股 (hk00700): 收 488.8，成本 480.00，-0.24%，当日 -240.00 / 持仓 +1760.00 [港股] | 跌破MA20
 - 特斯拉 (usTSLA): 收 352.42，成本 250.00，+0.99%，当日 +173.50 / 持仓 +5121.00 [美股]（美股隔夜收盘） | 跌破MA20
 ### 基金
@@ -307,7 +314,8 @@ daily-market-watch/
 │   ├── config.py                 # 配置管理
 │   ├── alert.py                  # 预警检查与 Lark 通知
 │   ├── report.py                 # 早盘/盘中/盘后报告生成
-│   └── tech_signals.py           # 技术指标计算（MA/MACD/KDJ/RSI）
+│   ├── tech_signals.py           # 技术指标计算（MA/MACD/KDJ/RSI）
+│   └── news_monitor.py           # 个股新闻舆情与持仓建议
 └── references/
     ├── data-sources.md           # API 端点与字段映射
     └── config-schema.md          # 配置与数据结构参考
@@ -338,6 +346,7 @@ A: 当前版本保留在 `~/.config/daily-market-watch/history/` 目录下，文
 - ✅ **持仓成本盈亏分析**：基于 `cost` 字段计算总持仓市值、累计浮盈/浮亏、收益率（已实现）
 - ✅ **市场情绪与北向资金**：A 股涨跌家数、涨停跌停数、等权涨幅、北向历史净流入（已实现）
 - ✅ **技术分析指标**：MACD、KDJ、RSI、均线（MA5/MA10/MA20）金叉死叉提示（已实现）
+- ✅ **新闻舆情与持仓建议**：基于 akshare 抓取个股新闻并做情绪分析，在报告和预警中给出仓位建议（已实现）
 - **个股资金流向**：引入主力净流入/大单动向，辅助判断筹码分布
 - **龙虎榜数据**：涨停/跌停个股的营业部买卖席位追踪
 - **融资融券余额**：个股两融余额变化，判断杠杆情绪

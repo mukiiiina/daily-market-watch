@@ -137,3 +137,47 @@ python scripts/tech_signals.py 600519
 python scripts/tech_signals.py hk00700
 python scripts/tech_signals.py TSLA
 ```
+
+### `news_monitor.py`
+
+```bash
+python scripts/news_monitor.py 600519
+python scripts/news_monitor.py 00700 --name 腾讯控股
+python scripts/news_monitor.py TSLA --name 特斯拉 --json
+```
+
+**Output schema (JSON)**:
+
+```json
+{
+  "code": "600519",
+  "name": "贵州茅台",
+  "price": 1438.0,
+  "change_pct": -0.37,
+  "news": [
+    {
+      "title": "...",
+      "content": "...",
+      "date": "2025-04-14",
+      "source": "东方财富",
+      "url": "..."
+    }
+  ],
+  "sentiment_counts": {
+    "positive": 1,
+    "negative": 2,
+    "neutral": 2
+  },
+  "sentiment": "negative",
+  "suggestion": "出现利空新闻但股价暂未明显反应，建议密切关注。"
+}
+```
+
+**Sentiment logic**:
+- Scans each news title against curated bullish/bearish keyword lists.
+- `positive` > `negative` → `sentiment: positive`
+- `negative` > `positive` → `sentiment: negative`
+- Otherwise → `sentiment: neutral`
+
+**Suggestion logic**:
+- Combines overall sentiment with current `change_pct` to generate a position-adjustment suggestion (e.g., reduce on bad news + large drop, hold on good news + moderate rise).

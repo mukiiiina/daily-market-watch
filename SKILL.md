@@ -36,6 +36,7 @@ Use this skill for queries like:
 - "早间看盘预热"
 - "茅台最近有什么新闻"
 - "帮我看看茅台的舆情"
+- "茅台资金流向怎么样"
 - "推送一份早盘报告到飞书"
 
 ## First-Time Setup
@@ -72,6 +73,7 @@ Always prefer calling the provided scripts rather than inventing external comman
 - Funds: `python {baseDir}/scripts/fetch_market.py funds --codes 005827,110022`
 - Market breadth & northbound: `python {baseDir}/scripts/fetch_market.py breadth`
 - Tech signals: `python {baseDir}/scripts/tech_signals.py 600519`
+- Capital flow (A-share only): `python {baseDir}/scripts/fetch_market.py flow 600519`
 
 ### News & Sentiment
 
@@ -115,6 +117,7 @@ Map common phrases to script calls:
 - "热门板块" → `fetch_market.py sectors --top 5`
 - "市场情绪怎么样" / "涨跌家数" → `fetch_market.py breadth`
 - "茅台技术面怎么样" → `tech_signals.py 600519`
+- "茅台资金流向" / "主力资金" / "大单流向" → `fetch_market.py flow 600519`
 - "茅台新闻" / "茅台舆情" / "查看茅台的新闻" → `news_monitor.py 600519 --name 贵州茅台`
 - "预警" / "有没有触发" → `alert.py check`
 - "早盘" / "早间" → `report.py morning`

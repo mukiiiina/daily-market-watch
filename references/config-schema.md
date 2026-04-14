@@ -114,7 +114,36 @@ python scripts/fetch_market.py quote TSLA
 python scripts/fetch_market.py quotes sh600519,hk00700,usTSLA
 python scripts/fetch_market.py sectors --top 5
 python scripts/fetch_market.py funds --codes 005827,110022
+python scripts/fetch_market.py flow 600519
 ```
+
+**Capital flow output schema (JSON, A-share only)**:
+
+```json
+{
+  "code": "sh600519",
+  "date": "2025-10-15",
+  "close": 1438.04,
+  "change_pct": 0.77,
+  "main_force_net": 491291680.0,
+  "main_force_pct": 7.88,
+  "super_large_net": 255750208.0,
+  "super_large_pct": 4.10,
+  "large_net": 235541472.0,
+  "large_pct": 3.78,
+  "medium_net": -491043840.0,
+  "medium_pct": -7.88,
+  "small_net": -247836.0,
+  "small_pct": -0.00
+}
+```
+
+**Fields**:
+- `main_force_net` / `main_force_pct` — 主力净流入金额与占比（超大单+大单之和）
+- `super_large_net` / `super_large_pct` — 超大单净流入
+- `large_net` / `large_pct` — 大单净流入
+- `medium_net` / `medium_pct` — 中单净流入
+- `small_net` / `small_pct` — 小单净流入
 
 ### `alert.py`
 

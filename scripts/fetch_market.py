@@ -94,9 +94,10 @@ def format_volume(vol: Optional[float], code: str = "") -> str:
 def format_amount(amount: Optional[float]) -> str:
     if amount is None:
         return "-"
-    if amount >= 100_000_000:
+    a = abs(amount)
+    if a >= 100_000_000:
         return f"{amount / 100_000_000:.2f}亿"
-    if amount >= 10_000:
+    if a >= 10_000:
         return f"{amount / 10_000:.2f}万"
     return f"{amount:.0f}"
 
@@ -412,6 +413,74 @@ def cmd_funds(args: argparse.Namespace) -> int:
     return 0
 
 
+def fetch_stock_flow(code: str) -> dict:
+    """Fetch individual stock capital flow via akshare (A-share only)."""
+    if not code.startswith(("sh", "sz", "bj")):
+        return {"_unsupported": "Capital flow is currently supported for A-shares only."}
+    try:
+        import akshare as ak
+    except ImportError:
+        return {"_error": "akshare not installed"}
+    market = code[:2]
+    stock = code[2:]
+    try:
+        df = ak.stock_individual_fund_flow(stock=stock, market=market)
+        if df.empty:
+            return {"_error": "No flow data returned"}
+        latest = df.iloc[0]
+        # Positional mapping to bypass Windows encoding issues with column names:
+        # 0: date, 1: close, 2: change_pct,
+        # 3: main_force_net, 4: main_force_pct,
+        # 5: super_large_net, 6: super_large_pct,
+        # 7: large_net, 8: large_pct,
+        # 9: medium_net, 10: medium_pct,
+        # 11: small_net, 12: small_pct
+        def _n(idx):
+            try:
+                return float(latest.iloc[idx])
+            except (ValueError, TypeError):
+                return 0.0
+        return {
+            "code": code,
+            "date": str(latest.iloc[0]),
+            "close": _n(1),
+            "change_pct": _n(2),
+            "main_force_net": _n(3),
+            "main_force_pct": _n(4),
+            "super_large_net": _n(5),
+            "super_large_pct": _n(6),
+            "large_net": _n(7),
+            "large_pct": _n(8),
+            "medium_net": _n(9),
+            "medium_pct": _n(10),
+            "small_net": _n(11),
+            "small_pct": _n(12),
+        }
+    except Exception as e:
+        return {"_error": str(e)}
+
+
+def cmd_flow(args: argparse.Namespace) -> int:
+    code = normalize_security_code(args.code)
+    data = fetch_stock_flow(code)
+    if "_error" in data:
+        print(json.dumps({"error": data["_error"]}, ensure_ascii=False))
+        return 1
+    if "_unsupported" in data:
+        print(json.dumps({"unsupported": data["_unsupported"]}, ensure_ascii=False))
+        return 0
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print(f"{data['code']} 资金流向 ({data['date']})")
+        print(f"  主力净流入: {format_amount(data['main_force_net'])} ({data['main_force_pct']:+.2f}%)")
+        print(f"  超大单净流入: {format_amount(data['super_large_net'])} ({data['super_large_pct']:+.2f}%)")
+        print(f"  大单净流入: {format_amount(data['large_net'])} ({data['large_pct']:+.2f}%)")
+        print(f"  中单净流入: {format_amount(data['medium_net'])} ({data['medium_pct']:+.2f}%)")
+        print(f"  小单净流入: {format_amount(data['small_net'])} ({data['small_pct']:+.2f}%)")
+    return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Fetch A-share market data")
     parser.add_argument("--json", action="store_true", help="Output JSON")
@@ -439,6 +508,10 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     p_breadth = sub.add_parser("breadth", help="A-share market breadth and northbound flow")
     p_breadth.set_defaults(func=cmd_breadth)
+
+    p_flow = sub.add_parser("flow", help="Individual stock capital flow (A-share only)")
+    p_flow.add_argument("code", help="Stock code (e.g. 600519)")
+    p_flow.set_defaults(func=cmd_flow)
 
     args = parser.parse_args(argv)
     return args.func(args)

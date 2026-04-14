@@ -129,3 +129,11 @@ python scripts/report.py morning
 python scripts/report.py intraday
 python scripts/report.py evening
 ```
+
+### `tech_signals.py`
+
+```bash
+python scripts/tech_signals.py 600519
+python scripts/tech_signals.py hk00700
+python scripts/tech_signals.py TSLA
+```

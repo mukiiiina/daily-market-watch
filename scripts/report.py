@@ -92,6 +92,16 @@ def fetch_funds(codes: list[str]) -> list:
     return data if isinstance(data, list) else []
 
 
+def fetch_breadth() -> dict:
+    data = run_script("fetch_market.py", "--json", "breadth")
+    return data if isinstance(data, dict) else {}
+
+
+def fetch_tech_signals(code: str) -> dict:
+    data = run_script("tech_signals.py", "--json", code)
+    return data if isinstance(data, dict) else {}
+
+
 def format_change(pct):
     if pct is None:
         return "-"
@@ -132,6 +142,19 @@ def build_morning_report(config: dict, portfolio: dict, indices: list, sectors: 
         lines.append("暂无法获取大盘数据。")
     lines.append("")
 
+    # Market breadth
+    if detail == "detailed":
+        breadth_data = fetch_breadth()
+        b = breadth_data.get("breadth")
+        if b and "_error" not in b:
+            lines.append("## 市场情绪")
+            lines.append(f"- 涨跌分布：涨 {b['up']} / 跌 {b['down']} / 平 {b['flat']} | 涨停 {b['limit_up']} | 跌停 {b['limit_down']} | 等权涨幅 {b['avg_change']:+.2f}%")
+            nb = breadth_data.get("northbound")
+            if nb:
+                nb_str = f"{nb['net_inflow']/1e4:.2f}亿" if abs(nb['net_inflow']) >= 1e4 else f"{nb['net_inflow']:.2f}万"
+                lines.append(f"- 北向资金 ({nb['date']}): 净流入 {nb_str}")
+            lines.append("")
+
     # Sectors
     if detail == "detailed" and sectors:
         lines.append("## 热门板块动向")
@@ -154,11 +177,15 @@ def build_morning_report(config: dict, portfolio: dict, indices: list, sectors: 
                 q = code_map.get(s["code"], {})
                 prev = q.get("prev_close")
                 price = q.get("price")
+                qty = s.get("quantity", 0)
+                cost = s.get("cost", 0) or 0
+                holding_pnl = ((price or 0) - cost) * qty if cost else 0.0
                 lbl = market_label(s["code"])
                 suffix = f" [{lbl}]" if lbl else ""
                 if s["code"].startswith("us"):
                     suffix += "（美股为隔夜收盘数据）"
-                lines.append(f"- {s['name']} ({s['code']}): 昨收 {prev or '-'}，当前 {price or '-'}，{format_change(q.get('change_pct'))}{suffix}")
+                pnl_str = f" 持仓盈亏 {holding_pnl:+.2f}" if cost else ""
+                lines.append(f"- {s['name']} ({s['code']}): 昨收 {prev or '-'}，当前 {price or '-'}，{format_change(q.get('change_pct'))}{pnl_str}{suffix}")
         if funds:
             fund_codes = [f["code"] for f in funds]
             fund_data = fetch_funds(fund_codes)
@@ -166,7 +193,16 @@ def build_morning_report(config: dict, portfolio: dict, indices: list, sectors: 
             for f in funds:
                 info = code_map.get(f["code"], {})
                 growth = info.get("交易日-估算数据-估算增长率", "-")
-                lines.append(f"- {f['name']} ({f['code']}): 估算涨跌 {growth}")
+                nav = info.get("交易日-公布数据-单位净值", 0)
+                try:
+                    nav_f = float(nav)
+                except (ValueError, TypeError):
+                    nav_f = 0.0
+                qty = f.get("quantity", 0)
+                cost = f.get("cost", 0) or 0
+                holding_pnl = (nav_f - cost) * qty if cost else 0.0
+                pnl_str = f" 持仓盈亏 {holding_pnl:+.2f}" if cost else ""
+                lines.append(f"- {f['name']} ({f['code']}): 估算涨跌 {growth}{pnl_str}")
     lines.append("")
 
     # Watch focus
@@ -218,6 +254,19 @@ def build_evening_report(config: dict, portfolio: dict, indices: list, sectors: 
             lines.append(f"- {s['name']}: 涨跌 {s['change_pct']:+.2f}%  成交额 {amount_str}  领涨 {s['leading_name']}({s['leading_change_pct']:+.2f}%)")
         lines.append("")
 
+    # Market breadth
+    if detail == "detailed":
+        breadth_data = fetch_breadth()
+        b = breadth_data.get("breadth")
+        if b and "_error" not in b:
+            lines.append("## 市场情绪")
+            lines.append(f"- 涨跌分布：涨 {b['up']} / 跌 {b['down']} / 平 {b['flat']} | 涨停 {b['limit_up']} | 跌停 {b['limit_down']} | 等权涨幅 {b['avg_change']:+.2f}%")
+            nb = breadth_data.get("northbound")
+            if nb:
+                nb_str = f"{nb['net_inflow']/1e4:.2f}亿" if abs(nb['net_inflow']) >= 1e4 else f"{nb['net_inflow']:.2f}万"
+                lines.append(f"- 北向资金 ({nb['date']}): 净流入 {nb_str}")
+            lines.append("")
+
     # Holdings summary
     lines.append("## 持仓总结")
     stocks = portfolio.get("stocks", [])
@@ -226,6 +275,7 @@ def build_evening_report(config: dict, portfolio: dict, indices: list, sectors: 
         lines.append("暂无持仓。")
     else:
         total_day_pnl = 0.0
+        total_pnl = 0.0
         if stocks:
             stock_codes = [s["code"] for s in stocks]
             quotes = fetch_quotes(stock_codes)
@@ -236,13 +286,20 @@ def build_evening_report(config: dict, portfolio: dict, indices: list, sectors: 
                 price = q.get("price") or 0
                 prev = q.get("prev_close") or price
                 qty = s.get("quantity", 0)
+                cost = s.get("cost", 0) or 0
                 day_pnl = (price - prev) * qty
+                holding_pnl = (price - cost) * qty if cost else 0.0
                 total_day_pnl += day_pnl
+                total_pnl += holding_pnl
                 lbl = market_label(s["code"])
                 suffix = f" [{lbl}]" if lbl else ""
                 if s["code"].startswith("us"):
                     suffix += "（美股隔夜收盘）"
-                lines.append(f"- {s['name']} ({s['code']}): 收 {price or '-'}，{format_change(q.get('change_pct'))}，当日预估盈亏 {day_pnl:+.2f}{suffix}")
+                cost_str = f"，成本 {cost:.2f}" if cost else ""
+                pnl_str = f"{holding_pnl:+.2f}" if cost else "-"
+                tech = fetch_tech_signals(s["code"]) if detail == "detailed" else {}
+                tech_str = f" | {tech.get('summary', '')}" if tech and tech.get("summary") and "error" not in tech else ""
+                lines.append(f"- {s['name']} ({s['code']}): 收 {price or '-'}{cost_str}，{format_change(q.get('change_pct'))}，当日 {day_pnl:+.2f} / 持仓 {pnl_str}{suffix}{tech_str}")
         if funds:
             fund_codes = [f["code"] for f in funds]
             fund_data = fetch_funds(fund_codes)
@@ -262,10 +319,15 @@ def build_evening_report(config: dict, portfolio: dict, indices: list, sectors: 
                 except (ValueError, TypeError):
                     nav_f = 0.0
                 day_pnl = nav_f * qty * growth
+                cost = f.get("cost", 0) or 0
+                holding_pnl = (nav_f - cost) * qty if cost else 0.0
                 total_day_pnl += day_pnl
-                lines.append(f"- {f['name']} ({f['code']}): 估算涨跌 {growth_str}，当日预估盈亏 {day_pnl:+.2f}")
+                total_pnl += holding_pnl
+                cost_str = f"，成本 {cost:.3f}" if cost else ""
+                pnl_str = f"{holding_pnl:+.2f}" if cost else "-"
+                lines.append(f"- {f['name']} ({f['code']}): 估算涨跌 {growth_str}{cost_str}，当日 {day_pnl:+.2f} / 持仓 {pnl_str}")
         lines.append(f"")
-        lines.append(f"**当日总预估盈亏: {total_day_pnl:+.2f}**")
+        lines.append(f"**当日总预估盈亏: {total_day_pnl:+.2f}  |  持仓总盈亏: {total_pnl:+.2f}**")
     lines.append("")
 
     # Tomorrow outlook (lightweight, no professional advice)
@@ -306,18 +368,32 @@ def build_intraday_report(config: dict, portfolio: dict, indices: list) -> str:
             code_map = {q["code"]: q for q in quotes}
             for s in stocks:
                 q = code_map.get(s["code"], {})
+                price = q.get("price") or 0
+                qty = s.get("quantity", 0)
+                cost = s.get("cost", 0) or 0
+                holding_pnl = (price - cost) * qty if cost else 0.0
                 lbl = market_label(s["code"])
                 suffix = f" [{lbl}]" if lbl else ""
                 if s["code"].startswith("us"):
                     suffix += "（隔夜收盘）"
-                lines.append(f"- {s['name']} ({s['code']}): {q.get('price', '-')}  {format_change(q.get('change_pct'))}{suffix}")
+                pnl_str = f"  持仓盈亏 {holding_pnl:+.2f}" if cost else ""
+                lines.append(f"- {s['name']} ({s['code']}): {q.get('price', '-')}  {format_change(q.get('change_pct'))}{pnl_str}{suffix}")
         if funds:
             fund_data = fetch_funds([f["code"] for f in funds])
             code_map = {f.get("基金代码"): f for f in fund_data}
             for f in funds:
                 info = code_map.get(f["code"], {})
                 growth = info.get("交易日-估算数据-估算增长率", "-")
-                lines.append(f"- {f['name']} ({f['code']}): 估算 {growth}")
+                nav = info.get("交易日-公布数据-单位净值", 0)
+                try:
+                    nav_f = float(nav)
+                except (ValueError, TypeError):
+                    nav_f = 0.0
+                qty = f.get("quantity", 0)
+                cost = f.get("cost", 0) or 0
+                holding_pnl = (nav_f - cost) * qty if cost else 0.0
+                pnl_str = f"  持仓盈亏 {holding_pnl:+.2f}" if cost else ""
+                lines.append(f"- {f['name']} ({f['code']}): 估算 {growth}{pnl_str}")
         lines.append("")
 
     lines.append("*本 Skill 仅提供看盘辅助，不构成投资建议，投资有风险。*")

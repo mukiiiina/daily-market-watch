@@ -69,6 +69,29 @@ Key fields returned:
 - `leading_name` — top performing stock in the sector
 - `leading_change_pct` — change of the leading stock
 
-## Optional: AKShare
+## Historical K-Line Data (Technical Indicators)
 
-Some environments can reach East Money servers without proxy issues. In those environments, `akshare` can be used for richer historical data. The core skill does not depend on it.
+**Source**: AKShare + Sina Finance
+
+- A-share daily K-line: `ak.stock_zh_a_daily(symbol="sh600519")` (Sina Finance)
+- HK daily K-line: `ak.stock_hk_daily(symbol="00700")` (Sina Finance)
+- US daily K-line: `ak.stock_us_daily(symbol="TSLA")` (Sina Finance)
+- Used for computing MA, MACD, KDJ, RSI signals in `scripts/tech_signals.py`
+
+## Market Breadth
+
+**Source**: AKShare + Sina Finance
+
+- `ak.stock_zh_a_spot()` returns all ~5,500 A-share tickers in real time (Sina Finance)
+- Used to compute up/down/flat counts, limit-up/limit-down counts, and equal-weight average change
+
+## Northbound Capital
+
+**Source**: AKShare + East Money
+
+- `ak.stock_hsgt_hist_em()` returns historical northbound (Stock Connect) net inflow
+- Note: real-time northbound data during trading hours is not consistently available via free APIs
+
+## Optional: AKShare Fallback
+
+Some environments can reach East Money servers without proxy issues. In those environments, `akshare` can be used for richer historical data. The core skill uses Sina Finance-backed akshare functions where possible to avoid proxy issues.

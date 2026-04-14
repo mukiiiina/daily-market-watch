@@ -65,6 +65,8 @@ Always prefer calling the provided scripts rather than inventing external comman
 - Multiple quotes: `python {baseDir}/scripts/fetch_market.py quotes sh600519,hk00700,usTSLA`
 - Sectors: `python {baseDir}/scripts/fetch_market.py sectors --top 5`
 - Funds: `python {baseDir}/scripts/fetch_market.py funds --codes 005827,110022`
+- Market breadth & northbound: `python {baseDir}/scripts/fetch_market.py breadth`
+- Tech signals: `python {baseDir}/scripts/tech_signals.py 600519`
 
 ### Portfolio & Alerts
 
@@ -97,6 +99,8 @@ Map common phrases to script calls:
 - "帮我看一下持仓" → `portfolio.py --json list` + `fetch_market.py quotes <codes>`
 - "茅台多少钱" → `fetch_market.py quote 600519`
 - "热门板块" → `fetch_market.py sectors --top 5`
+- "市场情绪怎么样" / "涨跌家数" → `fetch_market.py breadth`
+- "茅台技术面怎么样" → `tech_signals.py 600519`
 - "预警" / "有没有触发" → `alert.py check`
 - "早盘" / "早间" → `report.py morning`
 - "盘后总结" / "收盘总结" → read latest `~/.config/daily-market-watch/history/evening_YYYYMMDD.md` or run `report.py evening`

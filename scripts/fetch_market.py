@@ -292,6 +292,71 @@ def cmd_sectors(args: argparse.Namespace) -> int:
     return 0
 
 
+def fetch_market_breadth() -> dict:
+    try:
+        import akshare as ak
+        import pandas as pd
+    except ImportError:
+        return {"_error": "akshare or pandas not installed"}
+
+    result: dict = {}
+    # A-share market breadth
+    try:
+        df = ak.stock_zh_a_spot()
+        change = pd.to_numeric(df["涨跌幅"], errors="coerce")
+        up = int((change > 0).sum())
+        down = int((change < 0).sum())
+        flat = int((change == 0).sum())
+        limit_up = int((change >= 9.9).sum())
+        limit_down = int((change <= -9.9).sum())
+        avg_change = float(change.mean())
+        result["breadth"] = {
+            "up": up,
+            "down": down,
+            "flat": flat,
+            "limit_up": limit_up,
+            "limit_down": limit_down,
+            "avg_change": round(avg_change, 2),
+        }
+    except Exception as e:
+        result["breadth"] = {"_error": str(e)}
+
+    # Northbound capital (historical daily, fallback to latest valid row)
+    try:
+        df_nb = ak.stock_hsgt_hist_em()
+        col = "当日成交净买额"
+        if col in df_nb.columns:
+            df_nb[col] = pd.to_numeric(df_nb[col], errors="coerce")
+            valid = df_nb[df_nb[col].notna()]
+            if not valid.empty:
+                latest = valid.iloc[-1]
+                result["northbound"] = {
+                    "date": str(latest["日期"]),
+                    "net_inflow": float(latest[col]),
+                }
+    except Exception:
+        pass
+    return result
+
+
+def cmd_breadth(args: argparse.Namespace) -> int:
+    data = fetch_market_breadth()
+    if "_error" in data:
+        print(json.dumps({"error": data["_error"]}, ensure_ascii=False))
+        return 1
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        b = data.get("breadth", {})
+        if "_error" not in b:
+            print(f"涨跌分布: 涨 {b['up']} | 跌 {b['down']} | 平 {b['flat']} | 涨停 {b['limit_up']} | 跌停 {b['limit_down']} | 等权涨幅 {b['avg_change']:+.2f}%")
+        nb = data.get("northbound")
+        if nb:
+            nb_str = f"{nb['net_inflow']/1e4:.2f}亿" if abs(nb['net_inflow']) >= 1e4 else f"{nb['net_inflow']:.2f}万"
+            print(f"北向资金 ({nb['date']}): 净流入 {nb_str}")
+    return 0
+
+
 def fetch_tencent_funds(codes: list[str]) -> dict:
     """Fetch fund NAV estimates via Tencent API (jj prefix)."""
     if not codes:
@@ -371,6 +436,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     p_funds.add_argument("--top", type=int, default=10, help="Number of funds to show")
     p_funds.add_argument("--codes", default="", help="Comma-separated fund codes")
     p_funds.set_defaults(func=cmd_funds)
+
+    p_breadth = sub.add_parser("breadth", help="A-share market breadth and northbound flow")
+    p_breadth.set_defaults(func=cmd_breadth)
 
     args = parser.parse_args(argv)
     return args.func(args)

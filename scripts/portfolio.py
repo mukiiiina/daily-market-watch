@@ -31,25 +31,34 @@ def save_portfolio(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def normalize_stock_code(code: str) -> str:
-    code = code.strip().lower()
-    if code.startswith(("sh", "sz", "bj")):
-        return code
-    if len(code) != 6:
-        return code
-    if code.startswith(("600", "601", "603", "605", "688", "689")):
-        return f"sh{code}"
-    if code.startswith(("000", "001", "002", "003", "300", "301")):
-        return f"sz{code}"
-    if code.startswith(("8", "4", "9")):
-        return f"bj{code}"
-    return f"sh{code}"
+def normalize_security_code(code: str) -> str:
+    raw = code.strip()
+    lowered = raw.lower()
+    if lowered.startswith(("sh", "sz", "bj", "hk")):
+        return lowered
+    if lowered.startswith("us"):
+        return f"us{raw[2:]}"
+    if lowered.isalpha():
+        return f"us{raw.upper()}"
+    if lowered.isdigit() and len(lowered) == 5:
+        return f"hk{lowered}"
+    if lowered.isdigit() and len(lowered) == 6:
+        if lowered.startswith(("600", "601", "603", "605", "688", "689")):
+            return f"sh{lowered}"
+        if lowered.startswith(("000", "001", "002", "003", "300", "301")):
+            return f"sz{lowered}"
+        if lowered.startswith(("8", "4", "9")):
+            return f"bj{lowered}"
+        return f"sh{lowered}"
+    if lowered.isdigit():
+        return f"hk{lowered.zfill(5)}"
+    return lowered
 
 
 def cmd_add(args: argparse.Namespace) -> int:
     data = load_portfolio()
     if args.type == "stock":
-        code = normalize_stock_code(args.code)
+        code = normalize_security_code(args.code)
         # Remove existing entry with same code
         data["stocks"] = [s for s in data["stocks"] if s["code"] != code]
         entry = {
@@ -87,7 +96,7 @@ def cmd_add(args: argparse.Namespace) -> int:
 def cmd_remove(args: argparse.Namespace) -> int:
     data = load_portfolio()
     if args.type == "stock":
-        code = normalize_stock_code(args.code)
+        code = normalize_security_code(args.code)
         before = len(data["stocks"])
         data["stocks"] = [s for s in data["stocks"] if s["code"] != code]
         save_portfolio(data)

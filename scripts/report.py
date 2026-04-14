@@ -98,6 +98,16 @@ def format_change(pct):
     return f"{pct:+.2f}%"
 
 
+def market_label(code: str) -> str:
+    if code.startswith(("sh", "sz", "bj")):
+        return "A股"
+    if code.startswith("hk"):
+        return "港股"
+    if code.startswith("us"):
+        return "美股"
+    return ""
+
+
 def build_index_summary(indices: list) -> str:
     parts = []
     for idx in indices:
@@ -144,7 +154,11 @@ def build_morning_report(config: dict, portfolio: dict, indices: list, sectors: 
                 q = code_map.get(s["code"], {})
                 prev = q.get("prev_close")
                 price = q.get("price")
-                lines.append(f"- {s['name']} ({s['code']}): 昨收 {prev or '-'}，当前 {price or '-'}，{format_change(q.get('change_pct'))}")
+                lbl = market_label(s["code"])
+                suffix = f" [{lbl}]" if lbl else ""
+                if s["code"].startswith("us"):
+                    suffix += "（美股为隔夜收盘数据）"
+                lines.append(f"- {s['name']} ({s['code']}): 昨收 {prev or '-'}，当前 {price or '-'}，{format_change(q.get('change_pct'))}{suffix}")
         if funds:
             fund_codes = [f["code"] for f in funds]
             fund_data = fetch_funds(fund_codes)
@@ -183,11 +197,14 @@ def build_evening_report(config: dict, portfolio: dict, indices: list, sectors: 
             vol = idx.get("volume")
             vol_str = "-"
             if vol is not None:
-                real_vol = vol * 100
+                code = idx.get("code", "").lower()
+                # A-share index volume is in "hand" (手), 1 hand = 100 shares
+                real_vol = vol * 100 if code.startswith(("sh", "sz", "bj")) else vol
+                unit = "手" if code.startswith(("sh", "sz", "bj")) else "股"
                 if real_vol >= 1e8:
-                    vol_str = f"{real_vol/1e8:.2f}亿手"
+                    vol_str = f"{real_vol/1e8:.2f}亿{unit}"
                 else:
-                    vol_str = f"{real_vol/1e4:.2f}万手"
+                    vol_str = f"{real_vol/1e4:.2f}万{unit}"
             lines.append(f"- {idx['name']}: 收 {idx.get('price', '-')}，成交 {vol_str}")
     else:
         lines.append("暂无法获取大盘数据。")
@@ -221,7 +238,11 @@ def build_evening_report(config: dict, portfolio: dict, indices: list, sectors: 
                 qty = s.get("quantity", 0)
                 day_pnl = (price - prev) * qty
                 total_day_pnl += day_pnl
-                lines.append(f"- {s['name']} ({s['code']}): 收 {price or '-'}，{format_change(q.get('change_pct'))}，当日预估盈亏 {day_pnl:+.2f}")
+                lbl = market_label(s["code"])
+                suffix = f" [{lbl}]" if lbl else ""
+                if s["code"].startswith("us"):
+                    suffix += "（美股隔夜收盘）"
+                lines.append(f"- {s['name']} ({s['code']}): 收 {price or '-'}，{format_change(q.get('change_pct'))}，当日预估盈亏 {day_pnl:+.2f}{suffix}")
         if funds:
             fund_codes = [f["code"] for f in funds]
             fund_data = fetch_funds(fund_codes)
@@ -285,7 +306,11 @@ def build_intraday_report(config: dict, portfolio: dict, indices: list) -> str:
             code_map = {q["code"]: q for q in quotes}
             for s in stocks:
                 q = code_map.get(s["code"], {})
-                lines.append(f"- {s['name']} ({s['code']}): {q.get('price', '-')}  {format_change(q.get('change_pct'))}")
+                lbl = market_label(s["code"])
+                suffix = f" [{lbl}]" if lbl else ""
+                if s["code"].startswith("us"):
+                    suffix += "（隔夜收盘）"
+                lines.append(f"- {s['name']} ({s['code']}): {q.get('price', '-')}  {format_change(q.get('change_pct'))}{suffix}")
         if funds:
             fund_data = fetch_funds([f["code"] for f in funds])
             code_map = {f.get("基金代码"): f for f in fund_data}

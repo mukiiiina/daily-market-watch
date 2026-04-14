@@ -42,7 +42,7 @@ All state is stored under `~/.config/daily-market-watch/`:
 
 ### Fields
 
-- `code` — normalized code (`sh`/`sz`/`bj` prefix for stocks; plain 6-digit for funds)
+- `code` — normalized code (`sh`/`sz`/`bj`/`hk`/`us` prefix for stocks; plain 6-digit for funds)
 - `name` — display name
 - `quantity` — holding quantity (shares for stocks, units for funds)
 - `cost` — average cost price (used for PnL estimation)
@@ -76,8 +76,14 @@ All state is stored under `~/.config/daily-market-watch/`:
 ### `portfolio.py`
 
 ```bash
-# Add stock
+# Add A-share
 python scripts/portfolio.py add stock 600519 --name 贵州茅台 --quantity 100 --cost 1400 --rise-alert 5 --fall-alert -3
+
+# Add HK stock
+python scripts/portfolio.py add stock 00700 --name 腾讯控股 --quantity 100 --cost 500 --rise-alert 5
+
+# Add US stock
+python scripts/portfolio.py add stock TSLA --name 特斯拉 --quantity 50 --cost 250 --rise-alert 5
 
 # Add fund
 python scripts/portfolio.py add fund 005827 --name 易方达蓝筹 --quantity 10000 --cost 2.5 --rise-alert 3
@@ -103,7 +109,9 @@ python scripts/config.py --json list
 ```bash
 python scripts/fetch_market.py indices
 python scripts/fetch_market.py quote 600519
-python scripts/fetch_market.py quotes sh600519,sz000001
+python scripts/fetch_market.py quote 00700
+python scripts/fetch_market.py quote TSLA
+python scripts/fetch_market.py quotes sh600519,hk00700,usTSLA
 python scripts/fetch_market.py sectors --top 5
 python scripts/fetch_market.py funds --codes 005827,110022
 ```

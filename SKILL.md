@@ -1,6 +1,6 @@
 ---
 name: daily-market-watch
-description: Daily A-share market watch assistant for Chinese stocks and funds. Use when the user asks about 看盘, 大盘, 持仓, 预警, stock alerts, fund NAV, market summary, or wants scheduled morning/evening market reports.
+description: Daily market watch assistant for A-shares, Hong Kong stocks, US stocks, and Chinese public funds. Use when the user asks about 看盘, 大盘, 持仓, 预警, stock alerts, fund NAV, market summary, or wants scheduled morning/evening market reports.
 metadata:
   {
     "openclaw":
@@ -22,7 +22,7 @@ metadata:
 
 # Daily Market Watch
 
-Help users track A-share stocks and public funds with pre-market briefings, intraday snapshots, post-market summaries, and price alerts.
+Help users track A-share, Hong Kong, and US stocks, plus Chinese public funds, with pre-market briefings, intraday snapshots, post-market summaries, and price alerts.
 
 ## When to Use
 
@@ -40,8 +40,10 @@ Use this skill for queries like:
 If the user has no holdings configured, guide them to add holdings before personalized reports can be generated.
 
 1. Add holdings:
-   - `python {baseDir}/scripts/portfolio.py add stock 600519 --name 贵州茅台 --quantity 100 --cost 1400 --rise-alert 5 --fall-alert -3`
-   - `python {baseDir}/scripts/portfolio.py add fund 005827 --name 易方达蓝筹 --quantity 10000 --cost 2.5 --rise-alert 3`
+   - A-share: `python {baseDir}/scripts/portfolio.py add stock 600519 --name 贵州茅台 --quantity 100 --cost 1400 --rise-alert 5 --fall-alert -3`
+   - HK: `python {baseDir}/scripts/portfolio.py add stock 00700 --name 腾讯控股 --quantity 100 --cost 500 --rise-alert 5`
+   - US: `python {baseDir}/scripts/portfolio.py add stock TSLA --name 特斯拉 --quantity 50 --cost 250 --rise-alert 5`
+   - Fund: `python {baseDir}/scripts/portfolio.py add fund 005827 --name 易方达蓝筹 --quantity 10000 --cost 2.5 --rise-alert 3`
 2. Set preferences:
    - `python {baseDir}/scripts/config.py set detail_level detailed`  # or concise
    - `python {baseDir}/scripts/config.py set morning_push 0915`
@@ -60,7 +62,7 @@ Always prefer calling the provided scripts rather than inventing external comman
 
 - Indices: `python {baseDir}/scripts/fetch_market.py indices`
 - Single quote: `python {baseDir}/scripts/fetch_market.py quote 600519`
-- Multiple quotes: `python {baseDir}/scripts/fetch_market.py quotes sh600519,sz000001`
+- Multiple quotes: `python {baseDir}/scripts/fetch_market.py quotes sh600519,hk00700,usTSLA`
 - Sectors: `python {baseDir}/scripts/fetch_market.py sectors --top 5`
 - Funds: `python {baseDir}/scripts/fetch_market.py funds --codes 005827,110022`
 
@@ -101,9 +103,9 @@ Map common phrases to script calls:
 
 ## Data Sources
 
-- Stocks/indices: Tencent Finance API (no key)
+- A-share/HK/US stocks and indices: Tencent Finance API (no key)
 - Funds: Tencent Finance API `jj` endpoint (no key)
-- Sectors: Sina Finance sector API (no key)
+- Sectors: Sina Finance sector API (A-share only, no key)
 
 ## Important Disclaimer
 

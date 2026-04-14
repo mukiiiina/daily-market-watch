@@ -32,26 +32,33 @@ def _parse_tencent_response(text: str) -> dict:
         if not data:
             continue
         fields = data.split("~")
+        def _f(idx):
+            if len(fields) <= idx or not fields[idx]:
+                return None
+            try:
+                return float(fields[idx])
+            except ValueError:
+                return None
+
         # Fields reference (verified against Tencent qt.gtimg.cn 2025-04):
         # 1: name, 2: code, 3: price, 4: prev_close, 5: open,
-        # 6: volume(hand), 31: change, 32: change_pct, 33: high, 34: low,
-        # 35: price/vol/amount combined, 36: volume(hand) duplicate,
-        # 37: amount(10k CNY), 38: turnover_rate(%), 39: pe, 46: pb
+        # 6: volume, 31: change, 32: change_pct, 33: high, 34: low,
+        # 37: amount, 38: turnover_rate(%), 39: pe, 46: pb (A-share only)
         results[code] = {
             "code": code,
             "name": fields[1] if len(fields) > 1 else "",
-            "price": float(fields[3]) if len(fields) > 3 and fields[3] else None,
-            "prev_close": float(fields[4]) if len(fields) > 4 and fields[4] else None,
-            "open": float(fields[5]) if len(fields) > 5 and fields[5] else None,
-            "volume": int(fields[6]) if len(fields) > 6 and fields[6] else None,
-            "change": float(fields[31]) if len(fields) > 31 and fields[31] else None,
-            "change_pct": float(fields[32]) if len(fields) > 32 and fields[32] else None,
-            "high": float(fields[33]) if len(fields) > 33 and fields[33] else None,
-            "low": float(fields[34]) if len(fields) > 34 and fields[34] else None,
-            "amount": float(fields[37]) if len(fields) > 37 and fields[37] else None,
-            "turnover_rate": float(fields[38]) if len(fields) > 38 and fields[38] else None,
-            "pe": float(fields[39]) if len(fields) > 39 and fields[39] else None,
-            "pb": float(fields[46]) if len(fields) > 46 and fields[46] else None,
+            "price": _f(3),
+            "prev_close": _f(4),
+            "open": _f(5),
+            "volume": _f(6),
+            "change": _f(31),
+            "change_pct": _f(32),
+            "high": _f(33),
+            "low": _f(34),
+            "amount": _f(37),
+            "turnover_rate": _f(38),
+            "pe": _f(39),
+            "pb": _f(46),
         }
     return results
 
@@ -68,16 +75,20 @@ def fetch_tencent(codes: list[str]) -> dict:
         return {"_error": str(e)}
 
 
-def format_volume(vol: Optional[int]) -> str:
+def format_volume(vol: Optional[float], code: str = "") -> str:
     if vol is None:
         return "-"
-    # Tencent volume is in "hand" (手), 1 hand = 100 shares
-    real_vol = vol * 100
+    code = code.lower()
+    # A-share volume is in "hand" (手), 1 hand = 100 shares
+    if code.startswith(("sh", "sz", "bj")):
+        real_vol = vol * 100
+    else:
+        real_vol = vol
     if real_vol >= 100_000_000:
         return f"{real_vol / 100_000_000:.2f}亿"
     if real_vol >= 10_000:
         return f"{real_vol / 10_000:.2f}万"
-    return str(real_vol)
+    return f"{real_vol:.0f}"
 
 
 def format_amount(amount: Optional[float]) -> str:
@@ -90,30 +101,45 @@ def format_amount(amount: Optional[float]) -> str:
     return f"{amount:.0f}"
 
 
-def normalize_stock_code(code: str) -> str:
+def normalize_security_code(code: str) -> str:
     """
-    Normalize a stock code to Tencent format.
-    600519 -> sh600519
-    000001 -> sz000001
-    300750 -> sz300750
-    688981 -> sh688981
+    Normalize a security code to Tencent format.
+    A-share:
+      600519 -> sh600519
+      000001 -> sz000001
+    HK:
+      00700  -> hk00700
+      5-digit numbers treated as HK by default
+    US:
+      TSLA   -> usTSLA
+      AAPL   -> usAAPL
     """
-    code = code.strip().lower()
-    if code.startswith(("sh", "sz", "bj")):
-        return code
-    if len(code) != 6:
-        return code
-    # Shanghai: 600, 601, 603, 605, 688
-    # Shenzhen: 000, 001, 002, 003, 300, 301
-    # Beijing: 430, 83, 87... (simplified, mostly 8/4 start)
-    if code.startswith(("600", "601", "603", "605", "688", "689")):
-        return f"sh{code}"
-    if code.startswith(("000", "001", "002", "003", "300", "301")):
-        return f"sz{code}"
-    if code.startswith(("8", "4", "9")):
-        return f"bj{code}"
-    # Default to sh for unknown 6-digit codes
-    return f"sh{code}"
+    raw = code.strip()
+    lowered = raw.lower()
+    if lowered.startswith(("sh", "sz", "bj", "hk")):
+        return lowered
+    # Already has US prefix: preserve ticker case (e.g. usTSLA -> usTSLA)
+    if lowered.startswith("us"):
+        return f"us{raw[2:]}"
+    # Pure letters -> US (e.g. TSLA, AAPL)
+    if lowered.isalpha():
+        return f"us{raw.upper()}"
+    # 5-digit numbers -> HK (e.g. 00700, 09988)
+    if lowered.isdigit() and len(lowered) == 5:
+        return f"hk{lowered}"
+    # 6-digit numbers -> A-share
+    if lowered.isdigit() and len(lowered) == 6:
+        if lowered.startswith(("600", "601", "603", "605", "688", "689")):
+            return f"sh{lowered}"
+        if lowered.startswith(("000", "001", "002", "003", "300", "301")):
+            return f"sz{lowered}"
+        if lowered.startswith(("8", "4", "9")):
+            return f"bj{lowered}"
+        return f"sh{lowered}"
+    # 4-digit or shorter numbers -> try HK first
+    if lowered.isdigit():
+        return f"hk{lowered.zfill(5)}"
+    return lowered
 
 
 def cmd_indices(args: argparse.Namespace) -> int:
@@ -122,6 +148,10 @@ def cmd_indices(args: argparse.Namespace) -> int:
         "sz399001": "深证成指",
         "sz399006": "创业板指",
         "sh000688": "科创50",
+        "hkHSI": "恒生指数",
+        "usIXIC": "纳斯达克",
+        "usDJI": "道琼斯",
+        "usINX": "标普500",
     }
     data = fetch_tencent(list(index_codes.keys()))
     if "_error" in data:
@@ -148,13 +178,13 @@ def cmd_indices(args: argparse.Namespace) -> int:
         print(json.dumps(results, ensure_ascii=False, indent=2))
     else:
         for r in results:
-            vol_str = format_volume(r.get("volume"))
+            vol_str = format_volume(r.get("volume"), r["code"])
             print(f"{r['name']} ({r['code']}): {r['price'] or '-'}  {r['change'] or 0:+.2f}  ({r['change_pct'] or 0:+.2f}%)  成交量:{vol_str}")
     return 0
 
 
 def cmd_quote(args: argparse.Namespace) -> int:
-    code = normalize_stock_code(args.code)
+    code = normalize_security_code(args.code)
     data = fetch_tencent([code])
     if "_error" in data:
         print(json.dumps({"error": data["_error"]}, ensure_ascii=False))
@@ -166,7 +196,7 @@ def cmd_quote(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(item, ensure_ascii=False, indent=2))
     else:
-        vol_str = format_volume(item.get("volume"))
+        vol_str = format_volume(item.get("volume"), item["code"])
         print(f"{item['name']} ({item['code']})")
         print(f"  当前价: {item['price'] or '-'}")
         print(f"  涨跌额: {item['change'] or 0:+.2f}")
@@ -181,7 +211,7 @@ def cmd_quote(args: argparse.Namespace) -> int:
 
 
 def cmd_quotes(args: argparse.Namespace) -> int:
-    codes = [normalize_stock_code(c) for c in args.codes.split(",")]
+    codes = [normalize_security_code(c) for c in args.codes.split(",")]
     data = fetch_tencent(codes)
     if "_error" in data:
         print(json.dumps({"error": data["_error"]}, ensure_ascii=False))
@@ -195,7 +225,7 @@ def cmd_quotes(args: argparse.Namespace) -> int:
         print(json.dumps(results, ensure_ascii=False, indent=2))
     else:
         for item in results:
-            vol_str = format_volume(item.get("volume"))
+            vol_str = format_volume(item.get("volume"), item["code"])
             print(f"{item['name']} ({item['code']}): {item['price'] or '-'}  {item['change'] or 0:+.2f}  ({item['change_pct'] or 0:+.2f}%)  成交量:{vol_str}")
     return 0
 

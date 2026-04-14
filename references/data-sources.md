@@ -7,11 +7,20 @@ This document describes the external data sources used by the Daily Market Watch
 **Source**: Tencent Finance API (`http://qt.gtimg.cn/q=`)
 
 - No API key required.
-- Real-time quotes for A-shares (Shanghai, Shenzhen, Beijing) and major indices.
+- Real-time quotes for A-shares (Shanghai, Shenzhen, Beijing), Hong Kong stocks, US stocks, and major indices.
 - Symbol prefixes:
   - `sh` — Shanghai (e.g., `sh600519`, `sh000001`)
   - `sz` — Shenzhen (e.g., `sz000001`, `sz399006`)
   - `bj` — Beijing Exchange (e.g., `bj430047`)
+  - `hk` — Hong Kong (e.g., `hk00700`, `hkHSI`)
+  - `us` — US stocks/indices (e.g., `usTSLA`, `usAAPL`, `usIXIC`)
+
+### Code Auto-Detection
+
+The scripts automatically detect market from the user input:
+- 6-digit numbers → A-share (`sh`/`sz`/`bj`)
+- 5-digit numbers → Hong Kong (`hk`)
+- Alphabetic codes → US (`us`)
 
 Key fields returned:
 - `price` — latest price
@@ -20,11 +29,16 @@ Key fields returned:
 - `high` / `low` — day high / low
 - `change` — absolute change
 - `change_pct` — percentage change
-- `volume` — in "hand" (手), 1 hand = 100 shares
-- `amount` — turnover in 10k CNY
+- `volume` — in "hand" (手) for A-shares; shares for HK/US
+- `amount` — turnover in 10k CNY (A-share) or native currency (HK/US)
 - `turnover_rate` — turnover rate (%)
 - `pe` — P/E ratio
 - `pb` — P/B ratio
+
+### Timezone Notes
+
+- A-shares and HK stocks follow Beijing time (CST).
+- US stocks show the most recent US market close data during Chinese daytime hours.
 
 ## Funds
 

@@ -168,8 +168,15 @@ def cmd_check(args: argparse.Namespace) -> int:
             payload = {
                 "msg_type": "interactive",
                 "card": {
-                    "header": {"title": {"tag": "plain_text", "content": "每日看盘预警"}},
-                    "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "\n".join(lines)}}],
+                    "header": {
+                        "title": {"tag": "plain_text", "content": "🚨 每日看盘预警"},
+                        "template": "red",
+                    },
+                    "elements": [
+                        {"tag": "div", "text": {"tag": "lark_md", "content": "\n".join(lines)}},
+                        {"tag": "hr"},
+                        {"tag": "note", "elements": [{"tag": "plain_text", "content": "本 Skill 仅提供看盘辅助，不构成投资建议，投资有风险。"}]},
+                    ],
                 },
             }
             requests.post(webhook, json=payload, timeout=10)

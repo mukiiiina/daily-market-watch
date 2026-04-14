@@ -38,7 +38,7 @@ def save_report(kind: str, content: str):
         f.write(content)
 
 
-def send_lark_webhook(webhook_url: str, title: str, content: str):
+def send_lark_webhook(webhook_url: str, title: str, content: str, template: str = "blue"):
     try:
         import requests
         payload = {
@@ -46,6 +46,7 @@ def send_lark_webhook(webhook_url: str, title: str, content: str):
             "card": {
                 "header": {
                     "title": {"tag": "plain_text", "content": title},
+                    "template": template,
                 },
                 "elements": [
                     {
@@ -426,7 +427,8 @@ def _handle_report_output(kind: str, report: str, config: dict):
     webhook = config.get("lark_webhook", "")
     if webhook:
         title_map = {"morning": "早间盘前预热", "evening": "盘后总结", "intraday": "盘中快照"}
-        send_lark_webhook(webhook, title_map.get(kind, kind), report)
+        template_map = {"morning": "green", "evening": "indigo", "intraday": "orange"}
+        send_lark_webhook(webhook, title_map.get(kind, kind), report, template_map.get(kind, "blue"))
     print(report)
 
 
